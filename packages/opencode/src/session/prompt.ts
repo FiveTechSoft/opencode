@@ -1,4 +1,4 @@
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+﻿import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import path from "path"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -1175,7 +1175,7 @@ const layer = Layer.effect(
             yield* events.publish(Session.Event.Error, { sessionID, error: error.toObject() })
             throw error
           }
-          const maxSteps = agent.steps ?? 1000
+          const maxSteps = agent.steps ?? 5000
           const isLastStep = step >= maxSteps
           msgs = yield* SessionReminders.apply({ messages: msgs, agent, session }).pipe(
             Effect.provideService(RuntimeFlags.Service, flags),
@@ -1296,7 +1296,7 @@ const layer = Layer.effect(
             if (finished && !handle.message.error) {
               // Surface any content-filter finish (e.g. Anthropic stop_reason:
               // refusal) as an error. These turns may have produced no visible
-              // output at all — previously the session went idle silently — or
+              // output at all â€” previously the session went idle silently â€” or
               // partial text that was cut off by the provider's filter.
               if (handle.message.finish === "content-filter") {
                 handle.message.error = new SessionV1.ContentFilterError({
@@ -1541,7 +1541,7 @@ export const CommandInput = Schema.Struct({
   arguments: Schema.String,
   command: Schema.String,
   variant: Schema.optional(Schema.String),
-  // Inlined (no identifier annotation) to keep the original SDK output — the
+  // Inlined (no identifier annotation) to keep the original SDK output â€” the
   // PromptInput call site below references FilePartInput by ref via the
   // Schema export in message-v2.ts.
   parts: Schema.optional(
