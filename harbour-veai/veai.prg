@@ -62,6 +62,9 @@ FUNCTION Main( ... )
 
    // Set console to UTF-8 for proper Unicode output
    hb_cdpSelect( "UTF8" )
+   // Force Windows console to UTF-8 codepage
+   // Force Windows console to UTF-8 codepage
+   hb_run( "cmd /c chcp 65001 > nul" )
 
    IF Len( aArgs ) == 0
       showHelp()
