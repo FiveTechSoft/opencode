@@ -60,6 +60,9 @@ FUNCTION Main( ... )
    LOCAL aArgs := hb_aParams()
    LOCAL hOpts
 
+   // Set console to UTF-8 for proper Unicode output
+   hb_cdpSelect( "UTF8" )
+
    IF Len( aArgs ) == 0
       showHelp()
       RETURN NIL
@@ -328,6 +331,7 @@ STATIC PROCEDURE runChat( hOpts )
       addMessage( aHistory, "user", cInput )
       cJson := buildChatRequest( hOpts, aHistory )
 
+      ? ""
       ?? "AI:  "
       cResponse := ""
       hState := initStreamState()

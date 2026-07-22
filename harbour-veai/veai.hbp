@@ -3,3 +3,4 @@ veai.prg
 -L=C:/harbour_/lib/win/bcc
 -lhbcurls
 -llibcurl
+-lxhb
