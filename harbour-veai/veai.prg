@@ -15,6 +15,7 @@
  *   veai.exe --chat --system "You are a Harbour expert"
  *   veai.exe --stream "Explain OOP in 3 sentences"
  *   veai.exe --model deepseek-v4-flash-free "Hello"
+ *   veai.exe --pick "Hello"
  *   veai.exe --temp 0.3 "Write a poem"
  *   veai.exe --list
  *   veai.exe --help
@@ -23,7 +24,8 @@
  *   /help              Show available commands
  *   /exit, /quit, /q   Exit chat
  *   /clear             Clear conversation history
- *   /model <name>      Change model
+ *   /model <name|num>  Change model by name or number
+ *   /pick              Interactive model selector
  *   /temp <value>      Change temperature (0.0-2.0)
  *   /system <text>     Set/change system prompt
  *   /history           Show conversation history
@@ -46,6 +48,11 @@
 #define CURL_TIMEOUT     120
 
 // ============================================================
+// Model Definitions
+// ============================================================
+#define MODEL_COUNT      5
+
+// ============================================================
 // Entry Point
 // ============================================================
 FUNCTION Main( ... )
@@ -65,6 +72,13 @@ FUNCTION Main( ... )
       showHelp()
    CASE hOpts[ "list" ]
       showModels()
+   CASE hOpts[ "pick" ]
+      pickModel( hOpts )
+      IF hOpts[ "chat" ]
+         runChat( hOpts )
+      ELSEIF ! Empty( hOpts[ "prompt" ] )
+         runOnce( hOpts )
+      ENDIF
    CASE hOpts[ "chat" ]
       runChat( hOpts )
    OTHERWISE
@@ -72,6 +86,99 @@ FUNCTION Main( ... )
    ENDCASE
 
    RETURN NIL
+
+// ============================================================
+// Model Array Builder
+// ============================================================
+STATIC FUNCTION buildModels()
+
+   LOCAL aModels := {}
+
+   AAdd( aModels, { "mimo-v2.5-free",           "200K" } )
+   AAdd( aModels, { "deepseek-v4-flash-free",    "200K" } )
+   AAdd( aModels, { "nemotron-3-ultra-free",     "1M"   } )
+   AAdd( aModels, { "north-mini-code-free",      "128K" } )
+   AAdd( aModels, { "laguna-s-2.1-free",         "128K" } )
+
+   RETURN aModels
+
+// ============================================================
+// Resolve Model Name from Number or String
+// ============================================================
+STATIC FUNCTION resolveModel( cInput )
+
+   LOCAL aModels
+   LOCAL nNum
+
+   IF Empty( cInput )
+      RETURN DEFAULT_MODEL
+   ENDIF
+
+   // If input is a number, pick from list
+   IF Len( cInput ) <= 2 .AND. IsDigit( AllTrim( cInput ) )
+      nNum := Val( AllTrim( cInput ) )
+      IF nNum >= 1 .AND. nNum <= MODEL_COUNT
+         aModels := buildModels()
+         RETURN aModels[ nNum ][ 1 ]
+      ENDIF
+   ENDIF
+
+   // Otherwise treat as model name
+   RETURN AllTrim( cInput )
+
+// ============================================================
+// Interactive Model Picker
+// ============================================================
+STATIC PROCEDURE pickModel( hOpts )
+
+   LOCAL aModels := buildModels()
+   LOCAL cInput
+   LOCAL nPick
+   LOCAL nI
+
+   ? ""
+   ? "Select a model:"
+   ? ""
+   FOR nI := 1 TO Len( aModels )
+      IF aModels[ nI ][ 1 ] == hOpts[ "model" ]
+         ?? "  "
+         ?? hb_ntos( nI )
+         ?? ". "
+         ?? aModels[ nI ][ 1 ]
+         ?? "  ("
+         ?? aModels[ nI ][ 2 ]
+         ?? ") *"
+         ? ""
+      ELSE
+         ? "  " + hb_ntos( nI ) + ". " + ;
+           PadR( aModels[ nI ][ 1 ], 30 ) + aModels[ nI ][ 2 ]
+      ENDIF
+   NEXT
+   ? ""
+   ? "Current: " + hOpts[ "model" ]
+   ? ""
+
+   ACCEPT "Pick number (or Enter to keep current): " TO cInput
+   cInput := AllTrim( cInput )
+
+   IF ! Empty( cInput ) .AND. Len( cInput ) <= 2 .AND. IsDigit( cInput )
+      nPick := Val( cInput )
+      IF nPick >= 1 .AND. nPick <= Len( aModels )
+         hOpts[ "model" ] := aModels[ nPick ][ 1 ]
+         ? "Model set to: " + hOpts[ "model" ]
+      ELSE
+         ? "Invalid selection. Keeping: " + hOpts[ "model" ]
+      ENDIF
+   ELSEIF ! Empty( cInput )
+      // Accept direct model name
+      hOpts[ "model" ] := resolveModel( cInput )
+      ? "Model set to: " + hOpts[ "model" ]
+   ELSE
+      ? "Keeping: " + hOpts[ "model" ]
+   ENDIF
+   ? ""
+
+   RETURN
 
 // ============================================================
 // Argument Parser
@@ -86,6 +193,7 @@ STATIC FUNCTION parseArgs( aArgs )
    hOpts[ "list"   ] := .F.
    hOpts[ "chat"   ] := .F.
    hOpts[ "stream" ] := .F.
+   hOpts[ "pick"   ] := .F.
    hOpts[ "model"  ] := DEFAULT_MODEL
    hOpts[ "system" ] := ""
    hOpts[ "temp"   ] := DEFAULT_TEMP
@@ -107,10 +215,13 @@ STATIC FUNCTION parseArgs( aArgs )
       CASE cArg == "-s" .OR. cArg == "--stream"
          hOpts[ "stream" ] := .T.
 
+      CASE cArg == "-p" .OR. cArg == "--pick"
+         hOpts[ "pick" ] := .T.
+
       CASE cArg == "-m" .OR. cArg == "--model"
          n++
          IF n <= Len( aArgs )
-            hOpts[ "model" ] := aArgs[ n ]
+            hOpts[ "model" ] := resolveModel( aArgs[ n ] )
          ENDIF
 
       CASE cArg == "--system"
@@ -135,7 +246,7 @@ STATIC FUNCTION parseArgs( aArgs )
       n++
    ENDDO
 
-   IF Empty( hOpts[ "prompt" ] ) .AND. ! hOpts[ "chat" ]
+   IF Empty( hOpts[ "prompt" ] ) .AND. ! hOpts[ "chat" ] .AND. ! hOpts[ "pick" ]
       hOpts[ "prompt" ] := "Explain what is Harbour programming language in 3 sentences"
    ENDIF
 
@@ -196,7 +307,7 @@ STATIC PROCEDURE runChat( hOpts )
    ? "OpenCode Zen - Interactive Chat"
    ? "================================"
    ? "Model: " + hOpts[ "model" ]
-   ? "Commands: /help /exit /clear /model <name> /temp <value>"
+   ? "Commands: /help /exit /clear /model /pick /temp /system"
    ? ""
 
    DO WHILE .T.
@@ -402,7 +513,7 @@ STATIC PROCEDURE processChunk( cData, hState )
       ENDIF
 
       cLine := Left( cBuffer, nPos - 1 )
-      IF SubStr( cBuffer, nPos, 2 ) == Chr(13) + Chr(10)
+      IF SubStr( cBuffer, nPos, 2 ) == Chr(13) + Chr(10 )
          cBuffer := SubStr( cBuffer, nPos + 2 )
       ELSE
          cBuffer := SubStr( cBuffer, nPos + 1 )
@@ -504,7 +615,8 @@ STATIC FUNCTION handleCommand( cInput, hOpts, aHistory )
       ? "  /help              Show this help"
       ? "  /exit, /quit, /q   Exit chat"
       ? "  /clear             Clear conversation history"
-      ? "  /model <name>      Change model (current: " + hOpts[ "model" ] + ")"
+      ? "  /model <name|num>  Change model (current: " + hOpts[ "model" ] + ")"
+      ? "  /pick              Interactive model picker"
       ? "  /temp <value>      Change temperature (current: " + hb_ntos( hOpts[ "temp" ] ) + ")"
       ? "  /system <text>     Set system prompt"
       ? "  /history           Show conversation history"
@@ -522,16 +634,21 @@ STATIC FUNCTION handleCommand( cInput, hOpts, aHistory )
       RETURN .T.
    ENDIF
 
-   IF cCmd == "models"
+   IF cCmd == "models" .OR. cCmd == "list"
       showModels()
+      RETURN .T.
+   ENDIF
+
+   IF cCmd == "pick"
+      pickModel( hOpts )
       RETURN .T.
    ENDIF
 
    IF Left( cCmd, 6 ) == "model "
       cArg := AllTrim( SubStr( cCmd, 7 ) )
       IF ! Empty( cArg )
-         hOpts[ "model" ] := cArg
-         ? "Model changed to: " + cArg
+         hOpts[ "model" ] := resolveModel( cArg )
+         ? "Model changed to: " + hOpts[ "model" ]
       ELSE
          ? "Current model: " + hOpts[ "model" ]
       ENDIF
@@ -595,15 +712,17 @@ STATIC PROCEDURE showHelp()
    ? "  -l, --list              List available models"
    ? "  -c, --chat              Interactive chat mode"
    ? "  -s, --stream            Enable streaming output"
-   ? "  -m, --model <name>      Set model (default: " + DEFAULT_MODEL + ")"
+   ? "  -p, --pick              Interactive model picker"
+   ? "  -m, --model <name|num>  Set model (default: " + DEFAULT_MODEL + ")"
    ? "  --system <text>         Set system prompt"
    ? "  --temp <value>          Set temperature (default: " + hb_ntos( DEFAULT_TEMP ) + ")"
    ? ""
    ? "Examples:"
    ? '  veai.exe "What is Harbour?"'
    ? '  veai.exe --chat'
+   ? '  veai.exe --pick "Hello"'
    ? '  veai.exe --chat --system "You are a Harbour expert"'
-   ? '  veai.exe --stream --model deepseek-v4-flash-free "Explain OOP"'
+   ? '  veai.exe --stream --model 3 "Explain OOP"'
    ? '  veai.exe --temp 0.3 "Write a haiku about coding"'
    ? ""
 
@@ -614,23 +733,20 @@ STATIC PROCEDURE showHelp()
 // ============================================================
 STATIC PROCEDURE showModels()
 
+   LOCAL aModels := buildModels()
+   LOCAL nI
+
    ? "Free models on OpenCode Zen:"
    ? ""
-   ? "  Model                        Context"
-   ? "  ---------------------------  -------"
-   ? "  mimo-v2.5-free               200K"
-   ? "  mimo-v2-pro-free             1M"
-   ? "  mimo-v2-flash-free           262K"
-   ? "  deepseek-v4-flash-free       200K"
-   ? "  glm-4.7-free                 204K"
-   ? "  glm-5-free                   204K"
-   ? "  nemotron-3-ultra-free        1M"
-   ? "  minimax-m3-free              200K"
-   ? "  kimi-k2.5-free               262K"
-   ? "  qwen3.6-plus-free            262K"
-   ? "  grok-code                    256K"
+   ? "  #  Model                        Context"
+   ? "  -- ---------------------------  -------"
+   FOR nI := 1 TO Len( aModels )
+      ? "  " + PadR( hb_ntos( nI ), 2 ) + " " + ;
+        PadR( aModels[ nI ][ 1 ], 30 ) + aModels[ nI ][ 2 ]
+   NEXT
    ? ""
-   ? 'Use: veai.exe --model <name> "your prompt"'
+   ? "Use: veai.exe --model <name|num> " + '"' + "your prompt" + '"'
+   ? "     veai.exe --pick " + '"' + "your prompt" + '"'
    ? ""
 
    RETURN
