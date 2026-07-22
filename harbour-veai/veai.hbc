@@ -1,0 +1,7 @@
+#
+# veai.hbc
+#
+
+description=veai
+
+{win}gt=gtcgi
