@@ -35,8 +35,8 @@
 
 #include "hbcurl.ch"
 
-
-
+// ============================================================
+// ============================================================
 // ============================================================
 // API Configuration
 // ============================================================
@@ -158,7 +158,7 @@ STATIC PROCEDURE pickModel( hOpts )
    ? "Current: " + hOpts[ "model" ]
    ? ""
 
-   ACCEPT "Pick number (or Enter to keep current): " TO cInput
+      ACCEPT "Pick number (or Enter to keep current): " TO cInput
    cInput := AllTrim( cInput )
 
    IF ! Empty( cInput ) .AND. Len( cInput ) <= 2 .AND. IsDigit( cInput )
