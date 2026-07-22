@@ -34,6 +34,7 @@
 
 
 #include "hbcurl.ch"
+#include "hbgtinfo.ch"
 
 // ============================================================
 // ============================================================
@@ -63,8 +64,8 @@ FUNCTION Main( ... )
    // Set console to UTF-8 for proper Unicode output
    hb_cdpSelect( "UTF8" )
    // Force Windows console to UTF-8 codepage
-   // Force Windows console to UTF-8 codepage
-   hb_run( "cmd /c chcp 65001 > nul" )
+   // Force Windows console to UTF-8 via GT interface
+   HB_GTINFO( HB_GTI_CODEPAGE, 65001 )
 
    IF Len( aArgs ) == 0
       showHelp()
