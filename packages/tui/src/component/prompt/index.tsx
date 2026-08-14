@@ -260,6 +260,15 @@ export function Prompt(props: PromptProps) {
     return messages.findLast((m): m is UserMessage => m.role === "user")
   })
 
+  // Child (subagent) sessions keep their own agent: prompts sent from their
+  // window must target the subagent, not the selected primary agent.
+  const childAgent = createMemo(() => {
+    if (!props.sessionID) return undefined
+    const session = sync.session.get(props.sessionID)
+    if (!session?.parentID) return undefined
+    return session.agent
+  })
+
   const usage = createMemo(() => {
     if (!props.sessionID) return
     const session = sync.session.get(props.sessionID)
@@ -959,6 +968,7 @@ export function Prompt(props: PromptProps) {
     if (!store.prompt.input) return false
     const agent = local.agent.current()
     if (!agent) return false
+    const agentName = childAgent() ?? agent.name
     const trimmed = store.prompt.input.trim()
     if (trimmed === "exit" || trimmed === "quit" || trimmed === ":q") {
       void exit()
@@ -999,7 +1009,7 @@ export function Prompt(props: PromptProps) {
       const res = await sdk.client.session.create({
         directory,
         workspace: workspaceID,
-        agent: agent.name,
+        agent: agentName,
         model: {
           providerID: selectedModel.providerID,
           id: selectedModel.modelID,
@@ -1059,7 +1069,7 @@ export function Prompt(props: PromptProps) {
       move.startSubmit()
       void sdk.client.session.shell({
         sessionID,
-        agent: agent.name,
+        agent: agentName,
         model: {
           providerID: selectedModel.providerID,
           modelID: selectedModel.modelID,
@@ -1083,7 +1093,7 @@ export function Prompt(props: PromptProps) {
         sessionID,
         command: command.slice(1),
         arguments: args,
-        agent: agent.name,
+        agent: agentName,
         model: `${selectedModel.providerID}/${selectedModel.modelID}`,
         variant,
         parts: nonTextParts.filter((x) => x.type === "file"),
@@ -1095,7 +1105,7 @@ export function Prompt(props: PromptProps) {
           {
             sessionID,
             ...selectedModel,
-            agent: agent.name,
+            agent: agentName,
             model: selectedModel,
             variant,
             parts: [
@@ -1289,7 +1299,7 @@ export function Prompt(props: PromptProps) {
     if (store.mode === "shell") return theme.primary
     const agent = local.agent.current()
     if (!agent) return theme.border
-    return local.agent.color(agent.name)
+    return local.agent.color(childAgent() ?? agent.name)
   })
 
   const showVariant = createMemo(() => {
@@ -1444,7 +1454,7 @@ export function Prompt(props: PromptProps) {
                   {(agent) => (
                     <>
                       <text fg={fadeColor(highlight(), agentMetaAlpha())}>
-                        {store.mode === "shell" ? "Shell" : Locale.titlecase(agent().name)}
+                        {store.mode === "shell" ? "Shell" : Locale.titlecase(childAgent() ?? agent().name)}
                       </text>
                       <Show when={store.mode === "normal" && local.permission.mode === "auto"}>
                         <text fg={fadeColor(theme.textMuted, agentMetaAlpha())}>auto</text>
