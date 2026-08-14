@@ -36,7 +36,13 @@ describe("session.retry.delay", () => {
   test("caps delay at 30 seconds when headers missing", () => {
     const error = apiError()
     const delays = Array.from({ length: 10 }, (_, index) => SessionRetry.delay(index + 1, error))
-    expect(delays).toStrictEqual([2000, 4000, 8000, 16000, 30000, 30000, 30000, 30000, 30000, 30000])
+    // Full jitter: each delay is a uniform draw in [250, cap], where the cap
+    // follows the deterministic exponential sequence.
+    const caps = [2000, 4000, 8000, 16000, 30000, 30000, 30000, 30000, 30000, 30000]
+    delays.forEach((d, i) => {
+      expect(d).toBeGreaterThanOrEqual(250)
+      expect(d).toBeLessThanOrEqual(caps[i])
+    })
   })
 
   test("prefers retry-after-ms when shorter than exponential", () => {
@@ -59,18 +65,24 @@ describe("session.retry.delay", () => {
 
   test("ignores invalid retry hints", () => {
     const error = apiError({ "retry-after": "not-a-number" })
-    expect(SessionRetry.delay(1, error)).toBe(2000)
+    const d = SessionRetry.delay(1, error)
+    expect(d).toBeGreaterThanOrEqual(250)
+    expect(d).toBeLessThanOrEqual(2000)
   })
 
   test("ignores malformed date retry hints", () => {
     const error = apiError({ "retry-after": "Invalid Date String" })
-    expect(SessionRetry.delay(1, error)).toBe(2000)
+    const d = SessionRetry.delay(1, error)
+    expect(d).toBeGreaterThanOrEqual(250)
+    expect(d).toBeLessThanOrEqual(2000)
   })
 
   test("ignores past date retry hints", () => {
     const pastDate = new Date(Date.now() - 5000).toUTCString()
     const error = apiError({ "retry-after": pastDate })
-    expect(SessionRetry.delay(1, error)).toBe(2000)
+    const d = SessionRetry.delay(1, error)
+    expect(d).toBeGreaterThanOrEqual(250)
+    expect(d).toBeLessThanOrEqual(2000)
   })
 
   test("uses retry-after values even when exceeding 10 minutes with headers", () => {

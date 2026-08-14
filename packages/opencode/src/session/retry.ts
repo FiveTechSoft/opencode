@@ -32,6 +32,14 @@ function cap(ms: number) {
   return Math.min(ms, RETRY_MAX_DELAY)
 }
 
+// Full jitter on the exponential backoff: without it, clients throttled by the
+// same 429 episode retry in lockstep and re-trigger the rate limit. Explicit
+// Retry-After headers stay authoritative (used as-is). The 250ms floor avoids
+// immediate re-hits when the jittered draw lands near zero.
+function jitter(ms: number) {
+  return Math.max(250, Math.round(Math.random() * ms))
+}
+
 export function delay(attempt: number, error?: SessionV1.APIError) {
   if (error) {
     const headers = error.data.responseHeaders
@@ -58,11 +66,11 @@ export function delay(attempt: number, error?: SessionV1.APIError) {
         }
       }
 
-      return cap(RETRY_INITIAL_DELAY * Math.pow(RETRY_BACKOFF_FACTOR, attempt - 1))
+      return jitter(cap(RETRY_INITIAL_DELAY * Math.pow(RETRY_BACKOFF_FACTOR, attempt - 1)))
     }
   }
 
-  return cap(Math.min(RETRY_INITIAL_DELAY * Math.pow(RETRY_BACKOFF_FACTOR, attempt - 1), RETRY_MAX_DELAY_NO_HEADERS))
+  return jitter(cap(Math.min(RETRY_INITIAL_DELAY * Math.pow(RETRY_BACKOFF_FACTOR, attempt - 1), RETRY_MAX_DELAY_NO_HEADERS)))
 }
 
 export function retryable(error: Err, provider: string) {

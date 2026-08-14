@@ -420,6 +420,13 @@ export const ShellTool = Tool.define(
         { env: {} },
       )
       return {
+        // Non-interactive env: credential prompts can never be answered here
+        // (stdin is ignored and there is no TTY), so make git/ssh fail fast
+        // instead of blocking until the tool timeout. Explicit values from the
+        // host env or plugins still win.
+        GIT_TERMINAL_PROMPT: "0",
+        GCM_INTERACTIVE: "never",
+        SSH_ASKPASS_REQUIRE: "never",
         ...process.env,
         ...extra.env,
       }

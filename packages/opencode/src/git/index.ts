@@ -112,7 +112,9 @@ const layer = Layer.effect(
         const result = yield* appProcess.run(
           ChildProcess.make("git", [...cfg, ...args], {
             cwd: opts.cwd,
-            env: opts.env,
+            // Credential prompts can never be answered here (no TTY): fail fast
+            // instead of blocking. Caller-provided opts.env still wins.
+            env: { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never", SSH_ASKPASS_REQUIRE: "never", ...opts.env },
             extendEnv: true,
             stdin: opts.stdin ?? "ignore",
             stdout: "pipe",
