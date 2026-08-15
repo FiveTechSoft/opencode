@@ -447,19 +447,29 @@ export function Autocomplete(props: {
   const commands = createMemo((): AutocompleteOption[] => {
     const results: AutocompleteOption[] = [...slashes()]
 
+    const insertSlash = (name: string) => {
+      const newText = "/" + name + " "
+      const cursor = props.input().logicalCursor
+      props.input().deleteRange(0, 0, cursor.row, cursor.col)
+      props.input().insertText(newText)
+      props.input().cursorOffset = Bun.stringWidth(newText)
+    }
+
+    // /btw is a TUI-side delivery modifier (handled in submit), not a
+    // server-side command, so it is listed here instead of via command.list.
+    results.push({
+      display: "/btw",
+      description: "Message the agent without interrupting its current turn",
+      onSelect: () => insertSlash("btw"),
+    })
+
     for (const serverCommand of sync.data.command) {
       if (serverCommand.source === "skill") continue
       const label = serverCommand.source === "mcp" ? ":mcp" : ""
       results.push({
         display: "/" + serverCommand.name + label,
         description: serverCommand.description,
-        onSelect: () => {
-          const newText = "/" + serverCommand.name + " "
-          const cursor = props.input().logicalCursor
-          props.input().deleteRange(0, 0, cursor.row, cursor.col)
-          props.input().insertText(newText)
-          props.input().cursorOffset = Bun.stringWidth(newText)
-        },
+        onSelect: () => insertSlash(serverCommand.name),
       })
     }
 
