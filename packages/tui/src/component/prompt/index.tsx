@@ -1099,6 +1099,23 @@ export function Prompt(props: PromptProps) {
         parts: nonTextParts.filter((x) => x.type === "file"),
       })
     } else {
+      // /btw <text>: steer like Claude Code — when the session is busy the
+      // server persists the message and the running loop picks it up at the
+      // next step boundary, without aborting the current provider turn.
+      // With an idle session it is just a normal prompt.
+      const btw = inputText.match(/^\/btw(?:[ \n]([\s\S]*))?$/)
+      if (btw && !(btw[1] ?? "").trim()) {
+        toast.show({ message: "Usage: /btw <message>", variant: "info", duration: 3000 })
+        return false
+      }
+      const promptText = btw ? btw[1].trimStart() : inputText
+      if (btw && status().type !== "idle") {
+        toast.show({
+          message: "Steering: delivered at the next step boundary of the current turn",
+          variant: "info",
+          duration: 3000,
+        })
+      }
       move.startSubmit()
       sdk.client.session
         .prompt(
@@ -1112,7 +1129,7 @@ export function Prompt(props: PromptProps) {
               ...editorParts,
               {
                 type: "text",
-                text: inputText,
+                text: promptText,
               },
               ...nonTextParts,
             ],
